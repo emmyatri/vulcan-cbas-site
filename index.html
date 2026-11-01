@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<title>Vulcan CBAS</title>
+<meta name="description" content="CBAS estimates concrete compressive strength at 3, 7 and 28 days from curing temperatures, and warns weeks early when a batch is heading for a low break.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@112,600;112,800;100,500&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: a single scrolling page like a lab report — wide navy hero, then alternating feature rows, a five-step method strip, and the team grid. */
+:root {
+  --navy: #263171;        /* Vulcan blue, the dominant colour */
+  --navy-deep: #1A2253;
+  --ground: #F2F3F6;      /* cured-concrete grey, biased toward the navy */
+  --surface: #FFFFFF;
+  --ink: #1B2140;
+  --muted: #5B6180;
+  --rule: #D9DCE6;
+  --warn: #C8561E;        /* the app's warning orange, used only for warnings */
+  --on-navy: #F4F6FC;
+  --on-navy-muted: #B9C0E2;
+  --shadow: 0 1px 2px rgba(27, 33, 64, .06), 0 8px 24px rgba(27, 33, 64, .08);
+  --display: "Archivo", "Arial Narrow", Arial, sans-serif;
+  --body: "Source Sans 3", "Segoe UI", Arial, sans-serif;
+  --data: "IBM Plex Mono", Consolas, "Courier New", monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --navy: #8D9BEA; --navy-deep: #0E1330; --ground: #10142A; --surface: #181D38;
+    --ink: #E7EAF6; --muted: #A2A8C6; --rule: #2B3254; --warn: #F08A55;
+    --on-navy: #F4F6FC; --on-navy-muted: #B9C0E2;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --navy: #8D9BEA; --navy-deep: #0E1330; --ground: #10142A; --surface: #181D38;
+  --ink: #E7EAF6; --muted: #A2A8C6; --rule: #2B3254; --warn: #F08A55;
+  --on-navy: #F4F6FC; --on-navy-muted: #B9C0E2;
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font: 400 1.0625rem/1.6 var(--body);
+}
+img { max-width: 100%; display: block; }
+a { color: inherit; }
+a:focus-visible, button:focus-visible { outline: 3px solid var(--warn); outline-offset: 3px; border-radius: 4px; }
+
+.wrap {
+  width: 100%;
+  max-width: 72rem;
+  margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+
+/* Navigation */
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--navy-deep); }
+.nav { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--navy-deep); }
+.nav .wrap { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: 12px; flex-wrap: wrap; }
+.brand { display: flex; align-items: center; gap: 12px; text-decoration: none; color: var(--on-navy); }
+.brand-logo { background: #FFFFFF; border-radius: 6px; padding: 4px 8px; }
+.brand-logo img { height: 28px; width: auto; }
+.brand-name { font: 800 1.125rem/1 var(--display); font-stretch: 112%; letter-spacing: .02em; }
+.nav-links { display: flex; gap: 24px; list-style: none; margin: 0; padding: 0; }
+.nav-links a { color: var(--on-navy-muted); text-decoration: none; font-weight: 600; font-size: .95rem; }
+.nav-links a:hover { color: var(--on-navy); }
+
+/* Hero */
+.hero { background: var(--navy-deep); color: var(--on-navy); }
+.hero .wrap { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 48px; align-items: center; padding-block: 56px 72px; }
+.eyebrow { font: 500 .78rem/1.3 var(--data); letter-spacing: .12em; text-transform: uppercase; color: var(--on-navy-muted); margin: 0 0 16px; }
+.hero h1 { font: 800 clamp(2.6rem, 6vw, 4.25rem)/0.98 var(--display); font-stretch: 112%; margin: 0 0 12px; letter-spacing: -.01em; }
+.hero h2 { font: 500 1.35rem/1.35 var(--display); font-stretch: 100%; margin: 0 0 20px; color: var(--on-navy); text-wrap: balance; }
+.hero p { color: var(--on-navy-muted); margin: 0 0 28px; max-width: 34rem; }
+.cta { display: inline-flex; align-items: center; gap: 8px; background: var(--on-navy); color: #1A2253; font-weight: 600; text-decoration: none; padding: 12px 22px; border-radius: 6px; }
+.cta:hover { background: #FFFFFF; }
+.hero-shot { background: #FFFFFF; border-radius: 10px; padding: 6px; box-shadow: 0 20px 50px rgba(0, 0, 0, .35); }
+.hero-shot img { border-radius: 6px; }
+.hero-caption { font: 500 .78rem/1.4 var(--data); color: var(--on-navy-muted); margin-top: 12px; }
+
+/* Break-age strip: the three test ages the whole system is built around */
+.ages { background: var(--surface); border-bottom: 1px solid var(--rule); }
+.ages .wrap { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; padding-block: 28px; }
+.age { display: flex; align-items: baseline; gap: 12px; }
+.age b { font: 800 2.4rem/1 var(--display); font-stretch: 112%; color: var(--navy); font-variant-numeric: tabular-nums; }
+.age span { color: var(--muted); font-size: .95rem; line-height: 1.35; }
+
+/* Sections */
+section.block { padding-block: 72px; }
+.section-head { max-width: 44rem; margin-bottom: 40px; }
+.section-head h2 { font: 800 clamp(1.9rem, 4vw, 2.6rem)/1.05 var(--display); font-stretch: 112%; margin: 0 0 12px; text-wrap: balance; }
+.section-head p { margin: 0; color: var(--muted); }
+
+.feature { display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 7fr); gap: 48px; align-items: center; padding-block: 36px; border-top: 1px solid var(--rule); }
+.feature:nth-of-type(even) { grid-template-columns: minmax(0, 7fr) minmax(0, 4fr); }
+.feature:nth-of-type(even) .feature-text { order: 2; }
+.feature h3 { font: 600 1.6rem/1.15 var(--display); font-stretch: 112%; margin: 0 0 10px; color: var(--navy); }
+.feature p { margin: 0 0 12px; max-width: 30rem; }
+.feature .stat { font: 500 .85rem/1.5 var(--data); color: var(--muted); margin: 0; }
+.feature .stat strong { color: var(--ink); font-weight: 500; }
+.feature .stat .warn { color: var(--warn); }
+.shots { display: grid; gap: 12px; }
+.shot { background: #FFFFFF; border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; box-shadow: var(--shadow); }
+
+/* Method */
+.method { background: var(--surface); border-block: 1px solid var(--rule); }
+.steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px; counter-reset: step; }
+.steps li { counter-increment: step; position: relative; padding-top: 52px; }
+.steps li::before {
+  content: counter(step); position: absolute; top: 0; left: 0;
+  width: 38px; height: 38px; border-radius: 50%; background: var(--navy); color: var(--surface);
+  display: grid; place-items: center; font: 800 1rem/1 var(--display);
+}
+.steps li:not(:last-child)::after { content: ""; position: absolute; top: 19px; left: 46px; right: 4px; height: 2px; background: var(--rule); }
+.steps h3 { font: 600 1.1rem/1.2 var(--display); font-stretch: 112%; margin: 0 0 6px; }
+.steps p { margin: 0; color: var(--muted); font-size: .95rem; line-height: 1.45; }
+.formula { margin-top: 36px; display: flex; flex-wrap: wrap; gap: 12px 32px; font: 500 .9rem/1.5 var(--data); color: var(--muted); }
+.formula code { font: inherit; color: var(--ink); }
+
+/* Team */
+.team { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+.member { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 24px; display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 4px 16px; align-content: start; }
+.avatar { grid-row: span 3; width: 64px; height: 64px; border-radius: 50%; background: var(--navy); color: var(--surface); display: grid; place-items: center; font: 800 1.2rem/1 var(--display); object-fit: cover; }
+.member h3 { font: 600 1.15rem/1.2 var(--display); font-stretch: 112%; margin: 0; align-self: end; }
+.role { margin: 0; color: var(--navy); font-weight: 600; font-size: .95rem; }
+.status { margin: 0; color: var(--muted); font-size: .9rem; }
+.contact { grid-column: 1 / -1; margin: 14px 0 0; padding-top: 14px; border-top: 1px solid var(--rule); display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: .92rem; }
+.contact span { font: 500 .85rem/1.5 var(--data); color: var(--muted); overflow-wrap: anywhere; }
+.contact a { font-weight: 600; color: var(--navy); }
+
+/* Footer */
+footer { background: var(--navy-deep); color: var(--on-navy-muted); font-size: .92rem; }
+footer .wrap { padding-block: 32px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 16px; }
+footer p { margin: 0; max-width: 42rem; }
+
+@media (max-width: 860px) {
+  .hero .wrap, .feature, .feature:nth-of-type(even) { grid-template-columns: minmax(0, 1fr); gap: 28px; }
+  .feature:nth-of-type(even) .feature-text { order: 0; }
+  .steps { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+  .steps li { padding-top: 0; padding-left: 54px; min-height: 38px; }
+  .steps li:not(:last-child)::after { display: none; }
+  .team { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 560px) {
+  .nav-links { gap: 16px; }
+  .ages .wrap { grid-template-columns: minmax(0, 1fr); }
+  .team { grid-template-columns: minmax(0, 1fr); }
+  section.block { padding-block: 52px; }
+}
+</style>
+</head>
+<body>
+
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="#top" aria-label="Vulcan CBAS home">
+      <span class="brand-logo"><img src="assets/vulcan-logo.svg" alt="Vulcan Materials Company"></span>
+      <span class="brand-name">CBAS</span>
+    </a>
+    <nav aria-label="Sections">
+      <ul class="nav-links">
+        <li><a href="#features">Features</a></li>
+        <li><a href="#how-it-works">How it works</a></li>
+        <li><a href="#team">The Team</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+  <section class="hero">
+    <div class="wrap">
+      <div>
+        <p class="eyebrow">Built for Vulcan Materials · KSU SWE 4713 · Fall 2026</p>
+        <h1>Vulcan CBAS</h1>
+        <h2>Concrete Batch Analysis System</h2>
+        <p>A desktop app for concrete technicians. It records each batch, its curing readings and its cylinder breaks, estimates strength at 3, 7 and 28 days, and warns weeks before the 28-day break when a batch is heading short.</p>
+        <a class="cta" href="#features">Learn more <span aria-hidden="true">↓</span></a>
+      </div>
+      <figure style="margin:0">
+        <div class="hero-shot">
+          <img src="assets/home.webp" width="1800" height="1125" alt="The CBAS Home screen: three batches at risk with their projected 28-day strength and the top reason, above the list of recent batches.">
+        </div>
+        <figcaption class="hero-caption">CBAS Home · synthetic test data</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <div class="ages" aria-label="Test ages">
+    <div class="wrap">
+      <div class="age"><b>3</b><span>day estimate, from the first<br>days of curing temperature</span></div>
+      <div class="age"><b>7</b><span>day estimate, re-fitted to<br>the 3-day breaks</span></div>
+      <div class="age"><b>28</b><span>day estimate, three weeks<br>before the cylinders break</span></div>
+    </div>
+  </div>
+
+  <section class="block" id="features">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>Know how a batch will break before you break it</h2>
+        <p>Concrete strength is traditionally confirmed by crushing cylinders at 28 days. By then the concrete is already in place. CBAS gives an estimate from day one and sharpens it as each break comes in.</p>
+      </div>
+
+      <article class="feature">
+        <div class="feature-text">
+          <h3>Early warning</h3>
+          <p>Home lists every batch projected to miss its target, largest shortfall first. Each batch explains why in plain language: a cold cure, too much water in the mix, early moisture loss.</p>
+          <p class="stat">VM-SYN-006 · projected <strong>4,733 PSI</strong> against a 6,200 PSI target · <span class="warn">24% short</span></p>
+        </div>
+        <div class="shots">
+          <div class="shot"><img src="assets/batches-at-risk.webp" width="1800" height="462" loading="lazy" alt="Batches at risk on the Home screen: VM-SYN-003, VM-SYN-006 and VM-SYN-002 with their projected 28-day strength, target and shortfall."></div>
+          <div class="shot"><img src="assets/early-warning.webp" width="1800" height="171" loading="lazy" alt="Warning banner for VM-SYN-006 listing the projected shortfall, a water-to-cement ratio outside the normal range, and a target 68% above what that ratio typically reaches."></div>
+        </div>
+      </article>
+
+      <article class="feature">
+        <div class="feature-text">
+          <h3>Strength over time</h3>
+          <p>Each batch gets a strength curve from day 0 to day 28. The dashed line is the prediction from temperature alone. When breaks come in, the curve is re-fitted through them and the original stays on the chart for comparison.</p>
+          <p class="stat">Before breaks <strong>6,212 PSI</strong> → re-fitted <strong>4,733 PSI</strong></p>
+        </div>
+        <div class="shots">
+          <div class="shot"><img loading="lazy" src="assets/strength-chart.webp" width="1800" height="1007" alt="Strength over time chart for batch VM-SYN-006: the prediction before breaks reaches 6,212 PSI, the re-fitted estimate ends at 4,733 PSI, and the actual 28-day breaks average 4,994 PSI."></div>
+        </div>
+      </article>
+
+      <article class="feature">
+        <div class="feature-text">
+          <h3>Estimates checked against real breaks</h3>
+          <p>Every estimate shows its basis and calibration. Once a cylinder is broken at that age, the card shows the actual break next to the estimate and how far apart they were.</p>
+          <p class="stat">28-day estimate <strong>4,733</strong> · actual <strong>4,994</strong> · 261 PSI (5.2%) below</p>
+        </div>
+        <div class="shots">
+          <div class="shot"><img src="assets/estimates.webp" width="1800" height="321" loading="lazy" alt="Three estimate cards for VM-SYN-006: 3-day 3,129 PSI and 7-day 3,969 PSI matching their breaks, and 28-day 4,733 PSI estimated against an actual break of 4,994 PSI."></div>
+        </div>
+      </article>
+
+      <article class="feature">
+        <div class="feature-text">
+          <h3>Curing readings</h3>
+          <p>Internal and ambient temperature, moisture, relative humidity, resistivity and CO₂ for every cylinder, through day 28. Readings outside the normal range are flagged where they were entered and on the chart.</p>
+          <p class="stat">VM-SYN-002 · ambient <strong>42–46 °F</strong> · every reading flagged</p>
+        </div>
+        <div class="shots">
+          <div class="shot"><img src="assets/curing-readings.webp" width="1800" height="945" loading="lazy" alt="Ambient temperature for batch VM-SYN-002 over 28 days, holding between 42 and 46 degrees Fahrenheit, with every reading flagged in orange."></div>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <section class="block method" id="how-it-works">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>How it works</h2>
+        <p>A deterministic engine built on published methods, not machine learning. Every number traces back to a reading or a break.</p>
+      </div>
+      <ol class="steps">
+        <li><h3>Temperature</h3><p>Internal curing temperature for each cylinder.</p></li>
+        <li><h3>Maturity</h3><p>Nurse–Saul degree-hours above a 14 °F datum.</p></li>
+        <li><h3>Equivalent age</h3><p>Days of curing at the 73.4 °F reference.</p></li>
+        <li><h3>Strength</h3><p>ACI 209R-92 strength curve, day 1 to day 28.</p></li>
+        <li><h3>Break adjustment</h3><p>Re-fitted to the 3- and 7-day breaks.</p></li>
+      </ol>
+      <div class="formula">
+        <span><code>M = Σ max(0, T − 14 °F) × Δt</code></span>
+        <span><code>f(t) = t ÷ (a + b·t) × f_ref</code></span>
+        <span>ASTM C1074 · ACI 209R-92</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" id="team">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>The Team</h2>
+        <p>Software engineering students at Kennesaw State University.</p>
+      </div>
+      <div class="team">
+        <!-- TODO for each member: confirm the role; replace the initials with
+             <img class="avatar" src="assets/team/NAME.jpg" alt="NAME">; fill in email, GitHub and LinkedIn. -->
+        <article class="member">
+          <div class="avatar" aria-hidden="true">AB</div>
+          <h3>Amelia Black</h3>
+          <p class="role">Team Lead · UI Lead</p>
+          <p class="status">Open to new opportunities</p>
+          <p class="contact"><span>TODO@students.kennesaw.edu</span><a href="#TODO-github">GitHub</a><a href="#TODO-linkedin">LinkedIn</a></p>
+        </article>
+        <article class="member">
+          <div class="avatar" aria-hidden="true">TS</div>
+          <h3>Tyler Schaefer</h3>
+          <p class="role">Co-Lead</p>
+          <p class="status">Open to new opportunities</p>
+          <p class="contact"><span>TODO@students.kennesaw.edu</span><a href="#TODO-github">GitHub</a><a href="#TODO-linkedin">LinkedIn</a></p>
+        </article>
+        <article class="member">
+          <div class="avatar" aria-hidden="true">SD</div>
+          <h3>Sam Dunseth</h3>
+          <p class="role">Backend Developer</p>
+          <p class="status">Open to new opportunities</p>
+          <p class="contact"><span>TODO@students.kennesaw.edu</span><a href="#TODO-github">GitHub</a><a href="#TODO-linkedin">LinkedIn</a></p>
+        </article>
+        <article class="member">
+          <div class="avatar" aria-hidden="true">DR</div>
+          <h3>Daniel Restrepo</h3>
+          <p class="role">Backend Developer</p>
+          <p class="status">Open to new opportunities</p>
+          <p class="contact"><span>TODO@students.kennesaw.edu</span><a href="#TODO-github">GitHub</a><a href="#TODO-linkedin">LinkedIn</a></p>
+        </article>
+        <article class="member">
+          <div class="avatar" aria-hidden="true">AO</div>
+          <h3>Amber O'Dwyer</h3>
+          <p class="role">UI Developer</p>
+          <p class="status">Open to new opportunities</p>
+          <p class="contact"><span>TODO@students.kennesaw.edu</span><a href="#TODO-github">GitHub</a><a href="#TODO-linkedin">LinkedIn</a></p>
+        </article>
+        <article class="member">
+          <div class="avatar" aria-hidden="true">HP</div>
+          <h3>Helena Patino Cruz</h3>
+          <p class="role">UI Developer</p>
+          <p class="status">Open to new opportunities</p>
+          <p class="contact"><span>TODO@students.kennesaw.edu</span><a href="#TODO-github">GitHub</a><a href="#TODO-linkedin">LinkedIn</a></p>
+        </article>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>All batches shown are synthetic test data. They show the system working, not real-world accuracy (SLA Section 1.3).</p>
+    <p>Kennesaw State University · Fall 2026</p>
+  </div>
+</footer>
+
+</body>
+</html>
